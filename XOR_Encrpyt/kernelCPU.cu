@@ -30,9 +30,9 @@ int main(int argc, char *argv[]) {
 
 	printf("########## CPU Run ##########\n");
 
-	fpIn = fopen("../io/input_clean.txt", "rb");
-	fpOutEnc = fopen("../io/outCPU_enc.txt", "wb");
-	fpOutDec = fopen("../io/outCPU_dec.txt", "wb");
+	fpIn = fopen("../io/input_clean_100M.bin", "rb");
+	fpOutEnc = fopen("../io/outCPU_enc.bin", "wb");
+	fpOutDec = fopen("../io/outCPU_dec.bin", "wb");
 	fpKey = fopen("../io/key.txt", "rb");
 	//start counter for performance mesaurements
 	StartCounter(); 

@@ -7,7 +7,7 @@
 
 #define SIZE_5K (1024 * 5)				// 5KB
 #define SIZE_5K_ULL4 (SIZE_5K / 32)		// 5 KB / (sizeof(unsigned long long) * 4)
-#define SIZE_10M (1024 * 1024 * 10)		// 10 MB	
+#define SIZE_10M (1024 * 1024 * 100)		// 10 MB	
 #define SIZE_10M_ULL4 (SIZE_10M / 32)	// 10 MB / (sizeof(unsigned long long) * 4)
 #define BLOCK_SIZE 1024
 
@@ -39,13 +39,17 @@ int main(int argc, char *argv[])
 	const size_t MEM_ULL4_SIZE = sizeof(memUll4_t);
 	memUll4_t *key, *in, *outEnc, *outDec;
 	mem_t *pSrc_Dev, *pKey_Dev, *pDstEnc_Dev, *pDstDec_Dev;
-	double duration = 0.0, start = 0.0, end = 0.0;
+	float kernelDuration = 0.0;
+	float totalDuration = 0.0;
+	cudaEvent_t start, stop;
 
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
 	printf("########## CUDA Run ##########\n");
 
-	fpIn = fopen("../io/input_clean.txt", "rb");
-	fpOutEnc = fopen("../io/outCUDA_enc.txt", "wb");
-	fpOutDec = fopen("../io/outCUDA_dec.txt", "wb");
+	fpIn = fopen("../io/input_clean_100M.bin", "rb");
+	fpOutEnc = fopen("../io/outCUDA_enc.bin", "wb");
+	fpOutDec = fopen("../io/outCUDA_dec.bin", "wb");
 	fpKey = fopen("../io/key.txt", "rb");
 	//start counter for performance mesaurements
 	StartCounter();
@@ -79,20 +83,28 @@ int main(int argc, char *argv[])
 			cudaMalloc(&pDstEnc_Dev, readFileSizeInBytes);
 
 			const float F_PI = (const float)acos(-1);
-			start = GetCounter();
+			cudaEventRecord(start);
 			encryptDecrypt<< <dimGrid, dimBlock >> >(pSrc_Dev, pDstEnc_Dev, pKey_Dev, readKeySizeInBytes, readFileSizeInBytes, F2_BASE ,F1_RAISE, F1_FACTOR, F3_FACTOR, F_PI);
-			end = GetCounter();
-			duration += (end - start);
+			cudaEventRecord(stop);
+
 			cudaMemcpy(outEnc, pDstEnc_Dev, readFileSizeInBytes, cudaMemcpyDeviceToHost);
+			cudaEventSynchronize(stop);
+
+			cudaEventElapsedTime(&kernelDuration, start, stop);
+			totalDuration += kernelDuration;
 
 			fwrite(outEnc, MEM_ULL4_SIZE, readFileMemCount, fpOutEnc);
 
 			cudaMalloc(&pDstDec_Dev, readFileSizeInBytes);
-			start = GetCounter();
+			cudaEventRecord(start);
 			encryptDecrypt << <dimGrid, dimBlock >> >(pDstEnc_Dev, pDstDec_Dev, pKey_Dev, readKeySizeInBytes, readFileSizeInBytes, F2_BASE, F1_RAISE, F1_FACTOR, F3_FACTOR, F_PI);
-			end = GetCounter();
-			duration += (end - start);
+			cudaEventRecord(stop);
+
 			cudaMemcpy(outDec, pDstDec_Dev, readFileSizeInBytes, cudaMemcpyDeviceToHost);
+			cudaEventSynchronize(stop);
+			
+			cudaEventElapsedTime(&kernelDuration, start, stop);
+			totalDuration += kernelDuration;
 
 			fwrite(outDec, MEM_ULL4_SIZE, readFileMemCount, fpOutDec);
 		}
@@ -106,7 +118,7 @@ int main(int argc, char *argv[])
 		printf("File Not Found\n");
 	}
 	printf("Duration of the run: %f milliseconds.\n", GetCounter());
-	printf("Encrypt + Decrypt: %f milliseconds.\n", duration);
+	printf("Encrypt + Decrypt: %f milliseconds.\n", totalDuration);
 	printf("End\n");
 
 	free(key);
